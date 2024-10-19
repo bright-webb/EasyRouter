@@ -2,7 +2,7 @@
     "name": "bright-webb/easy-router",
     "description": "Easy Router is a lightweight PHP routing library designed to simplify url management and request handling for web applications",
     "type": "library",
-    "license": "MIT License",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "EasyRouter\\": "src/"
