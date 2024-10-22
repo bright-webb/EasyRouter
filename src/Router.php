@@ -4,7 +4,25 @@ use EasyRouter\Flash;
 
 class Router {
     private $routes = [];
+    private $globalMiddleware = [];
+    private $routeGroups = [];
+    private $currentGroup = null;
+    private $namedRoutes = [];
+    private $patterns = [];
+    private $errorHandlers = [];
+    private $baseNamespace = '';
+    private static $instance = null;
     protected $middlewareRedirect = "/";
+
+   
+     private function __construct() {}
+    
+     public static function getInstance() {
+         if (self::$instance === null) {
+             self::$instance = new self();
+         }
+         return self::$instance;
+     }
 
     public function get($path, $callback) {
         $this->addRoute('GET', $path, $callback);
@@ -34,29 +52,96 @@ class Router {
         return $this;
     }
 
+    public function any($path, $callback) {
+        foreach(['GET', 'POST', 'PUT', 'DELETE', 'PATCH'] as $method) {
+            $this->addRoute($method, $path, $callback);
+        }
+        return $this;
+    }
+
     public function add($route, $path, $callback) {
         $this->addRoute($route, $path, $callback);
 
         return $this;
     }
 
-    // middleware
-    public function middleware($next, $callback = null){
-        ob_start();
-        ob_clean();
-        if(isset($_SESSION[$next])){
-            return $_SESSION[$next];
+    public function group(array $attributes, callable $callback) {
+        $previousGroup = $this->currentGroup;
+        
+        $this->currentGroup = [
+            'prefix' => $attributes['prefix'] ?? '',
+            'middleware' => $attributes['middleware'] ?? [],
+            'namespace' => $attributes['namespace'] ?? '',
+        ];
+        
+        $callback($this);
+        
+        $this->currentGroup = $previousGroup;
+        return $this;
+    }
+
+    // Named routes
+    public function name($name) {
+        $lastRoute = end($this->routes);
+        if ($lastRoute) {
+            $this->namedRoutes[$name] = $lastRoute['path'];
         }
-        else{
-            switch($callback){
-                case null:
-                    Flash::set('error', 'Session expired');
-                    break;
-                default:
-                    call_user_func($callback);
+        return $this;
+    }
+
+    // URL generation for named routes
+    public function url($name, $parameters = []) {
+        if (!isset($this->namedRoutes[$name])) {
+            throw new \Exception("Route {$name} not found.");
+        }
+
+        $uri = $this->namedRoutes[$name];
+        foreach ($parameters as $key => $value) {
+            $uri = str_replace("{{$key}}", $value, $uri);
+        }
+        return $uri;
+    }
+
+    public function pattern($name, $pattern) {
+        $this->patterns[$name] = $pattern;
+        return $this;
+    }
+
+
+
+    // middleware
+    public function middleware($middleware, $callback = null) {
+        if (is_array($middleware)) {
+            foreach ($middleware as $m) {
+                $this->globalMiddleware[] = $m;
+            }
+            return $this;
+        }
+
+        if ($callback === null) {
+            $lastRoute = end($this->routes);
+            if ($lastRoute) {
+                $this->routes[key($this->routes)]['middleware'][] = $middleware;
+            }
+            return $this;
+        }
+
+        
+        if(isset($_SESSION[$middleware])) {
+            return $_SESSION[$middleware];
+        } else {
+            if($callback === null) {
+                Flash::set('error', 'Session expired');
+            } else {
+                call_user_func($callback);
             }
         }
+        
+        return $this;
     }
+
+
+
 
     public function middlewareRedirect($redirectTo){
         $this->middlewareRedirect = $redirectTo;
@@ -84,11 +169,30 @@ class Router {
             return;
         }
 
+        
         foreach ($this->routes as $route) {
             $params = [];
             if ($route['method'] === $requestMethod && $this->matchRoute($route['path'], $requestUri, $params)) {
+                // Execute global middleware
+                foreach ($this->globalMiddleware as $middleware) {
+                    $response = $this->executeMiddleware($middleware);
+                    if ($response !== null) {
+                        return $response;
+                    }
+                }
+
+                if (isset($route['middleware'])) {
+                    foreach ($route['middleware'] as $middleware) {
+                        $response = $this->executeMiddleware($middleware);
+                        if ($response !== null) {
+                            return $response;
+                        }
+                    }
+                }
+                
                 return $this->executeCallback($route['callback'], $params);
             }
+            
         }
 
         $this->sendResponse(404, "404 Not Found");
@@ -132,6 +236,18 @@ class Router {
         }
     }
 
+    private function executeMiddleware($middleware) {
+        if (is_string($middleware)) {
+            $middleware = new $middleware();
+        }
+        
+        if (method_exists($middleware, 'handle')) {
+            return $middleware->handle();
+        }
+        
+        return null;
+    }
+
     private function isMethodSupported($method) {
         $supportedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];
         return in_array($method, $supportedMethods);
@@ -140,5 +256,18 @@ class Router {
     private function sendResponse($statusCode, $message) {
         http_response_code($statusCode);
         echo $message;
+    }
+
+    public function error($code, callable $handler) {
+        $this->errorHandlers[$code] = $handler;
+        return $this;
+    }
+
+    private function handleError($code, $message = '') {
+        if (isset($this->errorHandlers[$code])) {
+            call_user_func($this->errorHandlers[$code], $message);
+        } else {
+            $this->sendResponse($code, $message);
+        }
     }
 }

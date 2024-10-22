@@ -6,15 +6,27 @@ namespace Composer\Autoload;
 
 class ComposerStaticInit7a84f20da6e9800f51135209567c01ca
 {
+    public static $files = array (
+        '3512652293d592b3faf67267eee0bc44' => __DIR__ . '/../..' . '/src/Helper.php',
+    );
+
     public static $prefixLengthsPsr4 = array (
-        'B' => 
+        'P' => 
         array (
-            'BrightWebb\\EasyRouter\\' => 22,
+            'Psr\\Log\\' => 8,
+        ),
+        'E' => 
+        array (
+            'EasyRouter\\' => 11,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'BrightWebb\\EasyRouter\\' => 
+        'Psr\\Log\\' => 
+        array (
+            0 => __DIR__ . '/..' . '/psr/log/src',
+        ),
+        'EasyRouter\\' => 
         array (
             0 => __DIR__ . '/../..' . '/src',
         ),
