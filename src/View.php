@@ -1,13 +1,16 @@
 <?php
 
 namespace EasyRouter;
+use EasyRouter\Flash;
 
-class View  {
+class View {
     protected static $viewsPath;
     protected static $cache = [];
     protected static $layout;
     protected static $sections = [];
     protected static $currentSection;
+    protected static $data = [];
+    public static $sessions = [];
 
     public static function setViewsPath($path) {
         self::$viewsPath = rtrim($path, '/') . '/';
@@ -20,7 +23,6 @@ class View  {
 
     public static function render($view, $data = []) {
         $viewFile = self::getViewFile($view);
-        
         
         
         if(!file_exists($viewFile)) {
@@ -55,25 +57,42 @@ class View  {
         
         echo $content;  
         
-        return ''; 
+        return new self(); 
     }
 
-    public static function setLayout($layout) {
+    public static function layout($layout) {
         self::$layout = $layout;
     }
 
-    public static function section($name) {
+    public static function extend($layout, $data = []) {
+        self::$layout = $layout;
+        self::$data = $data;
+    }
+
+    // Get data passed to the parent view - extend
+    public static function props(){
+        return self::$data;
+    }
+
+    public static function renderLayout() {
+        extract(self::$data); 
+        include self::$layout; 
+    }
+
+
+    public static function section($name, $data = []) {
         self::$currentSection = $name;
         ob_start();
+        extract($data);
     }
 
     public static function endSection() {
-       if(!self::$currentSection){
-        throw new \Exception('No section started');
-       }
-
-       self::$sections[self::$currentSection] = ob_get_clean();
-       self::$currentSection = null;
+        if(!self::$currentSection){
+            throw new \Exception('No section started');
+           }
+    
+           self::$sections[self::$currentSection] = ob_get_clean();
+           self::$currentSection = null;
     }
 
     public static function sectionContent($name){
@@ -97,4 +116,28 @@ class View  {
         self::$cache[$view] = $file;
         return $file;
     }
+
+    public function back() {
+        header("Location: " . $_SERVER['HTTP_REFERER']);
+        return $this;
+    }
+
+    public static function redirect() {
+        return new self();
+    }
+
+    public function to($url){
+        header("Location: " . $url);
+        return $this;
+    }
+
+    public function with($key, $message){
+        $_SESSION['lu'][$key] = $message;
+    }
+
+    public static function setSession($data){
+        $_SESSION['fl']['data'] = $data;
+        self::$sessions = $data;
+    }
+    
 }

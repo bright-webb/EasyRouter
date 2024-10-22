@@ -1,15 +1,21 @@
 <?php
 namespace EasyRouter;
+use EasyRouter\Flash;
 
 class Router {
     private $routes = [];
+    protected $middlewareRedirect = "/";
 
     public function get($path, $callback) {
         $this->addRoute('GET', $path, $callback);
+
+        return $this;
     }
 
     public function post($path, $callback) {
         $this->addRoute('POST', $path, $callback);
+
+        return $this;
     }
 
     public function put($path, $callback) {
@@ -18,10 +24,42 @@ class Router {
 
     public function delete($path, $callback) {
         $this->addRoute('DELETE', $path, $callback);
+
+        return $this;
     }
 
     public function patch($path, $callback) {
         $this->addRoute('PATCH', $path, $callback);
+
+        return $this;
+    }
+
+    public function add($route, $path, $callback) {
+        $this->addRoute($route, $path, $callback);
+
+        return $this;
+    }
+
+    // middleware
+    public function middleware($next, $callback = null){
+        ob_start();
+        ob_clean();
+        if(isset($_SESSION[$next])){
+            return $_SESSION[$next];
+        }
+        else{
+            switch($callback){
+                case null:
+                    Flash::set('error', 'Session expired');
+                    break;
+                default:
+                    call_user_func($callback);
+            }
+        }
+    }
+
+    public function middlewareRedirect($redirectTo){
+        $this->middlewareRedirect = $redirectTo;
     }
 
     private function addRoute($method, $path, $callback) {
