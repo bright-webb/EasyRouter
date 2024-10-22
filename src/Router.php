@@ -14,9 +14,7 @@ class Router {
     private static $instance = null;
     protected $middlewareRedirect = "/";
 
-   
-     private function __construct() {}
-    
+
      public static function getInstance() {
          if (self::$instance === null) {
              self::$instance = new self();

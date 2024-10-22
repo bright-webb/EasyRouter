@@ -111,65 +111,43 @@ class View
     {
         echo self::$blocks[$name] ?? '';
     }
-    public static function render($view, $data = [])
-    {
-
-        try {
-            // Merge global data
-            $data = array_merge(self::$globalData, $data);
-
-            // Run view composers
-            if (isset(self::$viewComposers[$view])) {
-                foreach (self::$viewComposers[$view] as $callback) {
-                    $data = array_merge($data, call_user_func($callback, $data) ?? []);
-                }
-            }
-
-            $viewFile = self::getViewFile($view);
-
-            if (!file_exists($viewFile)) {
-                throw new \Exception("View file not found: $viewFile");
-            }
-
-            // Check cache
-            if ($cached = self::$cache[$view]) {
-                return $cached;
-            }
-
-            // process middleware
-            foreach (self::$middlewares as $middleware) {
-                $data = call_user_func($middleware, $data);
-            }
-
-            // inject flash messages into view data
-            $data['flash'] = [
-                'success' => Flash::get('success'),
-                'error' => Flash::get('error')
-            ];
-
-            // Extract the data array into variables
-            extract($data);
-            ob_start();
-            include $viewFile;
-            $content = ob_get_clean();
-            // If layout is set, render it with the captured content
-            if (self::$layout) {
-                $layout = self::$layout;
-                self::$layout = null; // reset the layout
-                return self::render($layout, ['content' => $content]);
-            }
-
-
-
-            echo $content;
-
-            return new self();
-        } catch (\Exception $e) {
-            return self::throwError($e, "Error rendering view: $view");
+    public static function render($view, $data = []) {
+        $viewFile = self::getViewFile($view);
+        
+        
+        if(!file_exists($viewFile)) {
+            throw new \Exception("View file not found: $viewFile");
         }
 
+       
+
+        // inject flash messages into view data
+        $data['flash'] = [
+            'success' => Flash::get('success'),
+            'error' => Flash::get('error')
+        ];
+
+        // Extract the data array into variables
+        extract($data);
+        
+        
+        ob_start();
+        include $viewFile;
+        $content = ob_get_clean();
 
 
+        // If layout is set, render it with the captured content
+        if(self::$layout){
+            $layout = self::$layout;
+            self::$layout = null; // reset the layout
+            return self::render($layout, ['content' => $content]);
+        }
+
+        
+        
+        echo $content;  
+        
+        return new self(); 
     }
 
     public static function layout($layout)
