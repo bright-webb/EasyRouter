@@ -78,6 +78,50 @@ class View
         return '/' . ltrim($path, '/');
     }
 
+    public static function share($key, $value = null, $persist=false){
+        if($persist === true){
+            if(session_id()){
+                @session_start();
+                $_SESSION['share'][$key] = $value;
+            }
+        }
+        if(is_array($key)){
+            if($persist == true){
+                self::$globalData = $_SESSION['share'][(string)$key];
+            }
+            self::$globalData = array_merge(self::$globalData, $key);
+        } else {
+            self::$globalData[$key] = $value;
+        }
+    }
+
+    public static function pluck($key){
+        // check session
+        if(session_id()){
+            @session_start();
+            if(isset($_SESSION['share'][$key])){
+                self::$globalData = $_SESSION['share'][$key];
+            }
+        }
+
+        return self::$globalData;
+    }
+
+    public static function composer($views, $callback){
+        $views = (array) $views;
+        foreach($views as $view){
+            self::$viewComposers[$view][] = $callback;
+        }
+    }
+
+    public static function renderComponent($name, $data = []){
+        if(isset(self::$components[$name])){
+            throw new \Exception("Component not found");
+        }
+
+        return self::render(self::$components[$name], $data);
+    }
+
     // Inheritance
     public static function block($name, $callback = null)
     {
@@ -113,7 +157,25 @@ class View
     }
     public static function render($view, $data = []) {
         $viewFile = self::getViewFile($view);
-        
+
+        // Merge global data
+        if(isset(self::$globalData)){
+            $data = array_merge(self::$globalData, $data);
+        }
+
+        // Run view composers
+        if(isset(self::$viewComposers[$view])){
+            foreach(self::$viewComposers[$view] as $callback){
+                $data = array_merge($data, call_user_func($callback));
+            }
+        }
+
+        // Add middleware
+        if(isset(self::$middlewares)){
+            foreach(self::$middlewares as $middleware){
+                $data = call_user_func($middleware);
+            }
+        }
         
         if(!file_exists($viewFile)) {
             throw new \Exception("View file not found: $viewFile");
@@ -285,6 +347,38 @@ class View
         return $this;
     }
 
+    // Caching
+    public static function cache($view, $minutes = 60){
+        $cacheFile = sys_get_temp_dir() . '/view_cache_ ' . md5($view);
+        if(file_exists($cacheFile) && (time() - filemtime($cacheFile) < $minutes * 60)){
+            return file_get_contents($cacheFile);
+        }
+        return false;
+    }
+
+    public static function clearCache($view = null) {
+        if ($view) {
+            $cacheFile = sys_get_temp_dir() . '/view_cache_' . md5($view);
+            if (file_exists($cacheFile)) {
+                unlink($cacheFile);
+            }
+        } else {
+            array_map('unlink', glob(sys_get_temp_dir() . '/view_cache_*'));
+        }
+    }
+
+    public static function push($name, $content) {
+        if (!isset(self::$sectionStack[$name])) {
+            self::$sectionStack[$name] = [];
+        }
+        self::$sectionStack[$name][] = $content;
+    }
+    
+    public static function stack($name) {
+        if (isset(self::$sectionStack[$name])) {
+            echo implode('', self::$sectionStack[$name]);
+        }
+    }
     public function with($key, $message)
     {
         $_SESSION['lu'][$key] = $message;
