@@ -212,6 +212,28 @@ class View
         return new self(); 
     }
 
+     // Add persistent global data for all views
+     public static function global($key, $value) {
+        self::$globalData[$key] = $value;
+    }
+
+    // Remove global data
+    public static function removeGlobal($key) {
+        unset(self::$globalData[$key]);
+    }
+
+    // Check if a view file exists
+    public static function exists($view) {
+        $file = self::getViewFile($view);
+        return file_exists($file);
+    }
+
+    // Load reusable partials into views
+    public static function partial($view, $data = []) {
+        return self::render($view, $data);
+    }
+
+
     public static function layout($layout)
     {
         self::$layout = $layout;
@@ -344,7 +366,7 @@ class View
     public function to($url)
     {
         header("Location: " . $url);
-        return $this;
+        exit;
     }
 
     // Caching
@@ -381,7 +403,7 @@ class View
     }
     public function with($key, $message)
     {
-        $_SESSION['lu'][$key] = $message;
+        $_SESSION[$key] = $message;
     }
 
     public static function setSession($data)

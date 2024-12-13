@@ -3,7 +3,9 @@ namespace EasyRouter;
 class Helper {
     // Start session
    public static function Session($key) {
-    self::StartSession();
+    if (!isset($_SESSION)) {
+        @session_start();
+    }
     return $_SESSION[$key] ?? null;
 }
 
@@ -18,13 +20,14 @@ class Helper {
     }
 }
 
+public static function env($key, $default = null) {
+    $value = getenv($key);
+    return $value !== false ? $value : $default;
+}
 
-    public static function Session($user){
-        
-        if(isset($_SESSION[$user])){
-            return $_SESSION[$user];
-        } else {
-            return false;
-        }
-    }
+public static function url($path) {
+    $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http';
+    return $protocol . '://' . $_SERVER['HTTP_HOST'] . '/' . ltrim($path, '/');
+}
+
 }

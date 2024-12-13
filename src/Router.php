@@ -5,6 +5,9 @@ use EasyRouter\Flash;
 class Router {
     private $routes = [];
     private $globalMiddleware = [];
+    private $middlewares = [];
+    private $routePrefix = '';
+    private $eventHooks = [];
     private $routeGroups = [];
     private $currentGroup = null;
     private $namedRoutes = [];
@@ -138,29 +141,90 @@ class Router {
         return $this;
     }
 
+    public function use(...$args) {
+        if (count($args) === 1) {
+            $arg = $args[0];
 
+            // Handle middleware 
+            if (is_callable($arg)) {
+                $this->middlewares[] = $arg;
+                return $this;
+            }
+
+            // Handle route prefix 
+            if (is_string($arg)) {
+                $this->routePrefix = '/' . trim($arg, '/');
+                return $this;
+            }
+
+            if (count($args) === 2 && is_string($args[0]) && is_callable($args[1])) {
+                $event = $args[0];
+                $callback = $args[1];
+    
+                if (!isset($this->eventHooks[$event])) {
+                    $this->eventHooks[$event] = [];
+                }
+                $this->eventHooks[$event][] = $callback;
+                return $this;
+            }
+        }
+
+       
+
+        throw new \InvalidArgumentException("Invalid arguments.");
+    }
+
+      // Middleware dispatch (globally and route-specific)
+      private function handleMiddleware($request) {
+        foreach ($this->middlewares as $middleware) {
+            $middleware($request);
+        }
+    }
+
+      // Event trigger (before or after route matching)
+      private function triggerEvent($event, $params = []) {
+        if (isset($this->eventHooks[$event])) {
+            foreach ($this->eventHooks[$event] as $callback) {
+                call_user_func_array($callback, $params);
+            }
+        }
+    }
 
 
     public function middlewareRedirect($redirectTo){
         $this->middlewareRedirect = $redirectTo;
     }
 
-    private function addRoute($method, $path, $callback) {
+    private function addRoute($method, $path, $callback, $priority = 0) {
         $this->routes[] = [
             'method' => $method,
             'path' => $this->formatPath($path),
-            'callback' => $callback
+            'callback' => $callback,
+            'priority' => $priority,
         ];
+        usort($this->routes, fn($a, $b) => $b['priority'] <=> $a['priority']);
     }
+
+    public function subdomain($subdomain, $callback) {
+        if ($_SERVER['HTTP_HOST'] === $subdomain) {
+            $callback($this);
+        }
+        return $this;
+    }
+    
 
     private function formatPath($path) {
         return '/' . trim($path, '/');
     }
 
-    public function dispatch() {
+    public function run() {
         $requestMethod = $_SERVER['REQUEST_METHOD'];
         $requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $requestMethod = strtoupper($requestMethod);
+
+        // Handle global middleware
+        $this->handleMiddleware($requestUri);
+        $this->triggerEvent('before', [$requestMethod, $requestUri]);
 
         if (!$this->isMethodSupported($requestMethod)) {
             $this->sendResponse(405, "405 Method Not Allowed");
@@ -193,6 +257,8 @@ class Router {
             
         }
 
+        // After route matching hook
+        $this->triggerEvent('after', [$requestMethod, $requestUri]);
         $this->sendResponse(404, "404 Not Found");
     }
 
@@ -245,6 +311,17 @@ class Router {
         
         return null;
     }
+
+    public function cacheRoutes($filePath) {
+        file_put_contents($filePath, serialize($this->routes));
+    }
+    
+    public function loadCachedRoutes($filePath) {
+        if (file_exists($filePath)) {
+            $this->routes = unserialize(file_get_contents($filePath));
+        }
+    }
+    
 
     private function isMethodSupported($method) {
         $supportedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'];

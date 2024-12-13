@@ -29,4 +29,30 @@ class Flash {
         }
         return isset($_SESSION['flash'][$key]);
     }
+
+    // Get all flash messages without removing them
+    public static function all() {
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
+        return $_SESSION['flash'] ?? [];
+    }
+
+    // Clear all flash messages
+    public static function clear() {
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
+        unset($_SESSION['flash']);
+    }
+
+    // Keep a specific flash message across requests
+    public static function keep($key) {
+        if (session_status() == PHP_SESSION_NONE) {
+            session_start();
+        }
+        if (isset($_SESSION['flash'][$key])) {
+            $_SESSION['persistent_flash'][$key] = $_SESSION['flash'][$key];
+        }
+    }
 }
