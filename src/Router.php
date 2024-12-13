@@ -181,7 +181,7 @@ class Router {
         }
     }
 
-      // Event trigger (before or after route matching)
+      // Event trigger 
       private function triggerEvent($event, $params = []) {
         if (isset($this->eventHooks[$event])) {
             foreach ($this->eventHooks[$event] as $callback) {
